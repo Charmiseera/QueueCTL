@@ -25,9 +25,9 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directories `src/cli/`, `src/models/`, `src/services/`, `tests/unit/`, `tests/integration/`, `tests/contract/` per implementation plan
-- [ ] T002 Initialize configuration paths and database name constants in `src/config.py`
-- [ ] T003 [P] Create initial test suite helper packages and `__init__.py` files in `tests/` directory
+- [x] T001 Create project directories `src/cli/`, `src/models/`, `src/services/`, `tests/unit/`, `tests/integration/`, `tests/contract/` per implementation plan
+- [x] T002 Initialize configuration paths and database name constants in `src/config.py`
+- [x] T003 [P] Create initial test suite helper packages and `__init__.py` files in `tests/` directory
 
 ---
 
@@ -37,9 +37,9 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Implement SQLite schema creation and connection helper in `src/services/db_service.py`
-- [ ] T005 [P] Implement job entity model representation class in `src/models/job.py`
-- [ ] T006 [P] Implement worker entity model representation class in `src/models/worker.py`
+- [x] T004 Implement SQLite schema creation and connection helper in `src/services/db_service.py`
+- [x] T005 [P] Implement job entity model representation class in `src/models/job.py`
+- [x] T006 [P] Implement worker entity model representation class in `src/models/worker.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 

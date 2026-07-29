@@ -12,6 +12,6 @@ Thumbs.db
 .idea/
 .agents/
 .specify/
-/specs
+specs/
 assignment.md
 assignments.md

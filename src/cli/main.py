@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import json
 import argparse
 import signal
-from src.services.queue_service import enqueue_job, list_jobs
+from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job
 from src.services.db_service import init_db, get_connection
 import src.services.worker_service as worker_service
 
@@ -42,6 +42,26 @@ def handle_list(args):
                 print("No jobs found.")
             for job in jobs:
                 print(f"ID: {job.id} | Command: {job.command} | State: {job.state} | Attempts: {job.attempts}/{job.max_retries}")
+    except Exception as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(2)
+
+def handle_dlq(args):
+    try:
+        if args.subcommand == "list":
+            jobs = list_jobs("dead")
+            # If they want JSON format, we could support that or default to print layout
+            # Standard list command already handles --json, but we can do a simple print here:
+            if not jobs:
+                print("No jobs in DLQ.")
+            for job in jobs:
+                print(f"ID: {job.id} | Command: {job.command} | State: {job.state} | Attempts: {job.attempts}/{job.max_retries}")
+        elif args.subcommand == "retry":
+            retry_dlq_job(args.job_id)
+            print(f"Job {args.job_id} successfully re-enqueued from DLQ.")
+    except ValueError as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(2)
@@ -133,8 +153,7 @@ def main():
         # Will implement under status
         pass
     elif args.command == "dlq":
-        # Will implement under DLQ
-        pass
+        handle_dlq(args)
     elif args.command == "config":
         # Will implement under config
         pass

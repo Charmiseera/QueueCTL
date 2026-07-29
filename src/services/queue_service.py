@@ -40,3 +40,23 @@ def list_jobs(state=None):
             """)
         
         return [Job.from_row(row) for row in cursor.fetchall()]
+
+def retry_dlq_job(job_id):
+    """Re-enqueues a dead job from the DLQ, resetting attempts to 0."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.execute("SELECT id, state FROM jobs WHERE id = ?;", (job_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Job {job_id} not found.")
+        if row["state"] != "dead":
+            raise ValueError(f"Job {job_id} is not in dead state (current state: {row['state']}).")
+
+        now_str = datetime.utcnow().isoformat() + "Z"
+        conn.execute("""
+        UPDATE jobs
+        SET state = 'pending', attempts = 0, run_at = ?, updated_at = ?, worker_id = NULL
+        WHERE id = ?;
+        """, (now_str, now_str, job_id))
+        conn.commit()
+

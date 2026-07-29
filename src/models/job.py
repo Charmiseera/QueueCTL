@@ -40,3 +40,8 @@ class Job:
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
+
+    def calculate_delay(self, backoff_base=2.0):
+        """Calculates backoff delay in seconds: base ^ attempts."""
+        return float(backoff_base) ** self.attempts
+

@@ -51,5 +51,17 @@ class TestJobModel(unittest.TestCase):
         self.assertEqual(job.created_at, "2026-07-29T11:50:00Z")
         self.assertEqual(job.updated_at, "2026-07-29T11:55:00Z")
 
+    def test_calculate_delay(self):
+        job = Job(id="job-4", command="echo delay")
+        job.attempts = 1
+        self.assertEqual(job.calculate_delay(2.0), 2.0)
+        job.attempts = 2
+        self.assertEqual(job.calculate_delay(2.0), 4.0)
+        job.attempts = 3
+        self.assertEqual(job.calculate_delay(2.0), 8.0)
+        # Verify custom base
+        job.attempts = 2
+        self.assertEqual(job.calculate_delay(3.0), 9.0)
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,7 +18,7 @@ def claim_job_simple(worker_id):
         # Find first eligible job
         cursor = conn.execute("""
         SELECT * FROM jobs
-        WHERE state = 'pending' AND datetime(run_at) <= datetime(?)
+        WHERE (state = 'pending' OR state = 'failed') AND datetime(run_at) <= datetime(?)
         ORDER BY created_at ASC
         LIMIT 1;
         """, (now_str,))

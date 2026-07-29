@@ -74,14 +74,14 @@
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] Create unit tests for exponential backoff calculations in `tests/unit/test_models.py`
+- [x] T012 [P] [US2] Create unit tests for exponential backoff calculations in `tests/unit/test_models.py`
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Implement exponential backoff delay calculation logic (`delay = base ^ attempts` seconds) in `src/models/job.py`
-- [ ] T014 [US2] Implement retry scheduler and DLQ transition database updates in `src/services/queue_service.py`
-- [ ] T015 [US2] Implement `dlq list` and `dlq retry` commands in `src/cli/main.py`
-- [ ] T016 [US2] Implement retry execution checks in the worker loop in `src/services/worker_service.py`
+- [x] T013 [US2] Implement exponential backoff delay calculation logic (`delay = base ^ attempts` seconds) in `src/models/job.py`
+- [x] T014 [US2] Implement retry scheduler and DLQ transition database updates in `src/services/queue_service.py`
+- [x] T015 [US2] Implement `dlq list` and `dlq retry` commands in `src/cli/main.py`
+- [x] T016 [US2] Implement retry execution checks in the worker loop in `src/services/worker_service.py`
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 

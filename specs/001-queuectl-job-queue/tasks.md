@@ -146,9 +146,9 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T028 Add README.md with setup, usage, and architecture overview
-- [ ] T029 Complete DECISIONS.md answering the 5 mandatory design questions
-- [ ] T030 Verify and run the entire test suite to ensure all scenario validations pass
+- [x] T028 Add README.md with setup, usage, and architecture overview
+- [x] T029 Complete DECISIONS.md answering the 5 mandatory design questions
+- [x] T030 Verify and run the entire test suite to ensure all scenario validations pass
 
 ---
 

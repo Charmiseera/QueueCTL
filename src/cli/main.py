@@ -8,7 +8,7 @@ import argparse
 import signal
 import subprocess
 import time
-from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job, set_config
+from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job, set_config, get_queue_status
 from src.services.db_service import init_db, get_connection
 import src.services.worker_service as worker_service
 
@@ -74,6 +74,25 @@ def handle_config(args):
     except ValueError as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
+    except Exception as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(2)
+
+def handle_status(args):
+    try:
+        status = get_queue_status()
+        print("=== QueueCTL Status ===")
+        print("\nJob State Counts:")
+        states = ["pending", "processing", "completed", "failed", "dead"]
+        for s in states:
+            count = status["jobs"].get(s, 0)
+            print(f"  {s.capitalize()}: {count}")
+            
+        print("\nActive Workers:")
+        if not status["workers"]:
+            print("  No active workers.")
+        for w in status["workers"]:
+            print(f"  ID: {w['id']} | PID: {w['pid']} | Last Heartbeat: {w['last_heartbeat']}")
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(2)
@@ -192,8 +211,7 @@ def main():
         elif args.subcommand == "stop":
             handle_worker_stop(args)
     elif args.command == "status":
-        # Will implement under status
-        pass
+        handle_status(args)
     elif args.command == "dlq":
         handle_dlq(args)
     elif args.command == "config":

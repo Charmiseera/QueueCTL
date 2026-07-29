@@ -141,5 +141,23 @@ def get_config(key):
         row = cursor.fetchone()
         return row["value"] if row else None
 
+def get_queue_status():
+    """Returns a dictionary summarizing job counts and active workers."""
+    init_db()
+    with get_connection() as conn:
+        # Get count per state
+        cursor = conn.execute("SELECT state, COUNT(*) as count FROM jobs GROUP BY state;")
+        state_counts = {row["state"]: row["count"] for row in cursor.fetchall()}
+        
+        # Get all workers
+        cursor_workers = conn.execute("SELECT id, pid, last_heartbeat FROM workers;")
+        workers = [{"id": r["id"], "pid": r["pid"], "last_heartbeat": r["last_heartbeat"]} for r in cursor_workers.fetchall()]
+        
+        return {
+            "jobs": state_counts,
+            "workers": workers
+        }
+
+
 
 

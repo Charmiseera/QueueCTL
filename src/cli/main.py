@@ -19,11 +19,15 @@ def handle_enqueue(args):
         command = data.get("command")
         max_retries = data.get("max_retries")
         
+        priority = data.get("priority", 0)
+        timeout = data.get("timeout", 60)
+        run_at = data.get("run_at")
+        
         if not job_id or not command:
             print("Error: JSON must contain 'id' and 'command'.", file=sys.stderr)
             sys.exit(1)
             
-        enqueue_job(job_id, command, max_retries)
+        enqueue_job(job_id, command, max_retries, priority, timeout, run_at)
         print(f"Job {job_id} enqueued successfully.")
     except json.JSONDecodeError:
         print("Error: Invalid JSON string.", file=sys.stderr)
@@ -95,6 +99,15 @@ def handle_status(args):
             print(f"  ID: {w['id']} | PID: {w['pid']} | Last Heartbeat: {w['last_heartbeat']}")
     except Exception as e:
         print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(2)
+
+def handle_dashboard(args):
+    try:
+        from src.dashboard import start_dashboard_server
+        port = getattr(args, "port", 8085) or 8085
+        start_dashboard_server(port)
+    except Exception as e:
+        print(f"Error starting dashboard: {str(e)}", file=sys.stderr)
         sys.exit(2)
 
 def setup_signals():
@@ -199,6 +212,10 @@ def main():
     config_set_parser.add_argument("key", choices=["max-retries", "backoff-base"], help="Configuration key")
     config_set_parser.add_argument("value", help="Configuration value")
 
+    # dashboard
+    dashboard_parser = subparsers.add_parser("dashboard")
+    dashboard_parser.add_argument("--port", type=int, default=8085, help="Port to run the dashboard server on")
+
     args = parser.parse_args()
 
     if args.command == "enqueue":
@@ -216,6 +233,8 @@ def main():
         handle_dlq(args)
     elif args.command == "config":
         handle_config(args)
+    elif args.command == "dashboard":
+        handle_dashboard(args)
 
 if __name__ == "__main__":
     main()

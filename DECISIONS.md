@@ -60,16 +60,11 @@ Moving a job to the DLQ (`dead` state) indicates that the job has exhausted all 
 
 ### 5. Adding Job Priorities Tomorrow
 
-**Surviving Unchanged:**
-- SQLite database initialization (`init_db`) and connection configuration.
-- The worker registration, heartbeat tracking daemon, and signaling mechanism.
-- The subprocess execution logic (`run_job`).
-- The config management subsystem.
-
-**Breaking / Requiring Changes:**
-- **Database Schema:** We would need to add a `priority` column to the `jobs` table (e.g. `priority INTEGER DEFAULT 0`).
-- **Claim Logic:** The SQL query inside `claim_job_atomic` would need to update its ordering criteria:
-  ```sql
-  ORDER BY priority DESC, created_at ASC
+**Implemented Design (Bonus Feature):**
+Job priorities have been successfully implemented as an optional parameter!
+- **Database Schema:** Added `priority` (default `0`) and `timeout` (default `60`) columns via dynamic table migrations in `init_db()`.
+- **Claim Logic:** Updated `claim_job_atomic` to fetch and prioritize tasks by sorting on `ORDER BY priority DESC, created_at ASC`. High-priority jobs automatically jump the queue to the front of execution.
+- **CLI Commands:** The `enqueue` handler accepts optional JSON keys `priority` and `timeout`, enabling custom execution thresholds:
+  ```json
+  {"id": "high-priority-job", "command": "echo fast", "priority": 10, "timeout": 15}
   ```
-- **CLI Commands:** The `enqueue` command parsing would need to accept an optional priority key in the JSON payload (e.g., `{"id": "job1", "command": "cmd", "priority": 10}`).

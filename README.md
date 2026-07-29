@@ -81,6 +81,19 @@ python src/cli/main.py config set max-retries 5
 python src/cli/main.py config set backoff-base 3.0
 ```
 
+### 8. Web Dashboard (Bonus Feature)
+Start the built-in, zero-dependency interactive dashboard server:
+```bash
+python src/cli/main.py dashboard --port 8085
+```
+Open `http://localhost:8085` to monitor active workers, job status counts, and view/modal-inspect stdout and stderr execution logs.
+
+### 9. Priority & Timeouts (Bonus Feature)
+Specify priority levels (higher numbers run first) and process execution timeouts (in seconds):
+```bash
+python src/cli/main.py enqueue '{"id": "quick-priority-job", "command": "echo prio", "priority": 100, "timeout": 15}'
+```
+
 ---
 
 ## System Architecture

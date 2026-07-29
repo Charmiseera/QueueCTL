@@ -14,9 +14,9 @@ from src.services.queue_service import recover_orphaned_jobs
 stop_requested = False
 
 def run_job(job):
-    """Executes a job's command via shell and returns the exit code."""
+    """Executes a job's command via shell with custom timeouts and returns exit code, stdout, stderr."""
+    timeout_sec = getattr(job, "timeout", 60) or 60
     try:
-        # Run command using system shell
         process = subprocess.Popen(
             job.command,
             shell=True,
@@ -24,31 +24,50 @@ def run_job(job):
             stderr=subprocess.PIPE,
             text=True
         )
-        
-        # Wait for the process to complete
-        stdout, stderr = process.communicate()
-        return process.returncode, stdout, stderr
+        try:
+            stdout, stderr = process.communicate(timeout=timeout_sec)
+            return process.returncode, stdout, stderr
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+            err_msg = f"Job exceeded timeout limit of {timeout_sec} seconds."
+            stderr = (stderr + "\n" + err_msg) if stderr else err_msg
+            return -2, stdout, stderr
     except Exception as e:
         return -1, "", str(e)
 
-def update_job_status(job_id, success, attempts, max_retries, backoff_base=2.0):
-    """Updates job state to completed, failed, or dead based on success and attempts."""
+def update_job_status(job_id, success, attempts, max_retries, backoff_base=2.0, stdout=None, stderr=None):
+    """Updates job state to completed, failed, or dead based on success and attempts, saving logs."""
     now_str = datetime.utcnow().isoformat() + "Z"
     with get_connection() as conn:
+        cursor_info = conn.execute("PRAGMA table_info(jobs);")
+        columns = [row["name"] for row in cursor_info.fetchall()]
+        
+        log_set = ""
+        log_args = []
+        if "stdout" in columns:
+            log_set += ", stdout = ?"
+            log_args.append(stdout)
+        if "stderr" in columns:
+            log_set += ", stderr = ?"
+            log_args.append(stderr)
+            
         if success:
-            conn.execute("""
+            sql = f"""
             UPDATE jobs
-            SET state = 'completed', worker_id = NULL, updated_at = ?
+            SET state = 'completed', worker_id = NULL, updated_at = ? {log_set}
             WHERE id = ?;
-            """, (now_str, job_id))
+            """
+            conn.execute(sql, (now_str, *log_args, job_id))
         else:
             if attempts >= max_retries:
                 # Move to DLQ (dead)
-                conn.execute("""
+                sql = f"""
                 UPDATE jobs
-                SET state = 'dead', worker_id = NULL, updated_at = ?
+                SET state = 'dead', worker_id = NULL, updated_at = ? {log_set}
                 WHERE id = ?;
-                """, (now_str, job_id))
+                """
+                conn.execute(sql, (now_str, *log_args, job_id))
             else:
                 # Calculate backoff delay
                 delay = float(backoff_base) ** attempts
@@ -56,11 +75,12 @@ def update_job_status(job_id, success, attempts, max_retries, backoff_base=2.0):
                 run_at_dt = datetime.utcnow().timestamp() + delay
                 run_at_str = datetime.utcfromtimestamp(run_at_dt).isoformat() + "Z"
                 
-                conn.execute("""
+                sql = f"""
                 UPDATE jobs
-                SET state = 'failed', worker_id = NULL, run_at = ?, updated_at = ?
+                SET state = 'failed', worker_id = NULL, run_at = ?, updated_at = ? {log_set}
                 WHERE id = ?;
-                """, (run_at_str, now_str, job_id))
+                """
+                conn.execute(sql, (run_at_str, now_str, *log_args, job_id))
         conn.commit()
 
 def register_worker(worker_id):
@@ -159,7 +179,7 @@ def worker_loop(worker_id=None):
                 
                 # Update status
                 success = (returncode == 0)
-                update_job_status(job.id, success, job.attempts, job.max_retries, backoff_base)
+                update_job_status(job.id, success, job.attempts, job.max_retries, backoff_base, stdout, stderr)
                 
                 if success:
                     print(f"[{worker_id}] Job {job.id} completed successfully.")

@@ -61,19 +61,48 @@ def init_db():
         VALUES ('backoff-base', ?);
         """, (str(DEFAULT_BACKOFF_BASE),))
         
+        # Check and apply migrations for new columns if they do not exist
+        cursor_info = conn.execute("PRAGMA table_info(jobs);")
+        columns = [row["name"] for row in cursor_info.fetchall()]
+        if "priority" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN priority INTEGER DEFAULT 0;")
+        if "timeout" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN timeout INTEGER DEFAULT 60;")
+        if "stdout" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN stdout TEXT;")
+        if "stderr" not in columns:
+            conn.execute("ALTER TABLE jobs ADD COLUMN stderr TEXT;")
+            
         conn.commit()
 
 def claim_job_atomic(worker_id, now_str):
-    """Claims the next pending job atomically using BEGIN IMMEDIATE transaction."""
+    """Claims the next pending job atomically using BEGIN IMMEDIATE transaction, sorting by priority."""
     conn = get_connection()
     try:
         conn.execute("BEGIN IMMEDIATE TRANSACTION;")
+        
+        # Check available columns to stay backward-compatible
+        cursor_info = conn.execute("PRAGMA table_info(jobs);")
+        columns = [row["name"] for row in cursor_info.fetchall()]
+        
+        select_fields = "id, command, state, attempts, max_retries, worker_id, run_at, created_at, updated_at"
+        order_clause = "created_at ASC"
+        if "priority" in columns:
+            select_fields += ", priority"
+            order_clause = "priority DESC, " + order_clause
+        if "timeout" in columns:
+            select_fields += ", timeout"
+        if "stdout" in columns:
+            select_fields += ", stdout"
+        if "stderr" in columns:
+            select_fields += ", stderr"
+            
         # Find next eligible job
-        cursor = conn.execute("""
-        SELECT id, command, state, attempts, max_retries, worker_id, run_at, created_at, updated_at
+        cursor = conn.execute(f"""
+        SELECT {select_fields}
         FROM jobs
         WHERE (state = 'pending' OR state = 'failed') AND datetime(run_at) <= datetime(?)
-        ORDER BY created_at ASC
+        ORDER BY {order_clause}
         LIMIT 1;
         """, (now_str,))
         row = cursor.fetchone()
@@ -90,8 +119,8 @@ def claim_job_atomic(worker_id, now_str):
         """, (worker_id, now_str, job_id))
         
         # Refetch the updated job inside the transaction
-        cursor = conn.execute("""
-        SELECT id, command, state, attempts, max_retries, worker_id, run_at, created_at, updated_at
+        cursor = conn.execute(f"""
+        SELECT {select_fields}
         FROM jobs
         WHERE id = ?;
         """, (job_id,))

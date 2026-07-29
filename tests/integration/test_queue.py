@@ -9,22 +9,16 @@ from src.services.queue_service import enqueue_job, list_jobs
 
 class TestQueueIntegration(unittest.TestCase):
     def setUp(self):
-        # Fresh DB before each test
-        if os.path.exists(DB_PATH):
-            try:
-                os.remove(DB_PATH)
-            except:
-                pass
-            if os.path.exists(DB_PATH + "-wal"):
-                try:
-                    os.remove(DB_PATH + "-wal")
-                except:
-                    pass
-            if os.path.exists(DB_PATH + "-shm"):
-                try:
-                    os.remove(DB_PATH + "-shm")
-                except:
-                    pass
+        # Clean DB tables instead of deleting the locked file
+        from src.services.db_service import get_connection
+        try:
+            with get_connection() as conn:
+                conn.execute("DROP TABLE IF EXISTS jobs;")
+                conn.execute("DROP TABLE IF EXISTS workers;")
+                conn.execute("DROP TABLE IF EXISTS config;")
+                conn.commit()
+        except:
+            pass
 
     def tearDown(self):
         self.setUp()
@@ -95,6 +89,62 @@ class TestQueueIntegration(unittest.TestCase):
             os.remove(log_file)
         except:
             pass
+
+    def test_crash_recovery(self):
+        # 1. Enqueue a job
+        enqueue_job("job-crash-test", "echo crash_recovered", max_retries=2)
+        
+        # 2. Start worker and allow it to claim it, then SIGKILL it
+        # To simulate a worker crashing mid-job, we can register a worker and mark the job as processing
+        from src.services.db_service import get_connection
+        from datetime import datetime, timedelta
+        
+        now = datetime.utcnow()
+        now_str = now.isoformat() + "Z"
+        # Simulate worker check-in 20 seconds ago (expired heartbeat)
+        expired_hb_str = (now - timedelta(seconds=20)).isoformat() + "Z"
+        
+        with get_connection() as conn:
+            # Register worker with expired heartbeat
+            conn.execute("""
+            INSERT INTO workers (id, pid, last_heartbeat, should_stop)
+            VALUES ('worker-dead-1', 99999, ?, 0);
+            """, (expired_hb_str,))
+            
+            # Associate job with this dead worker and set state to processing
+            conn.execute("""
+            UPDATE jobs
+            SET state = 'processing', worker_id = 'worker-dead-1', updated_at = ?, attempts = 1
+            WHERE id = 'job-crash-test';
+            """, (now_str,))
+            conn.commit()
+            
+        # 3. Running recover_orphaned_jobs should reset the job to pending
+        from src.services.queue_service import recover_orphaned_jobs
+        recover_orphaned_jobs()
+        
+        # 4. Verify job is pending again
+        jobs = list_jobs("pending")
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].id, "job-crash-test")
+        self.assertIsNone(jobs[0].worker_id)
+        
+        # 5. Start worker to complete the job
+        p = subprocess.Popen(
+            [sys.executable, "src/cli/main.py", "worker", "start"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        time.sleep(3)
+        # Stop worker
+        subprocess.run([sys.executable, "src/cli/main.py", "worker", "stop"])
+        p.wait(timeout=5)
+        
+        # Verify job is completed
+        completed_jobs = list_jobs("completed")
+        self.assertEqual(len(completed_jobs), 1)
+        self.assertEqual(completed_jobs[0].id, "job-crash-test")
 
 if __name__ == "__main__":
     unittest.main()

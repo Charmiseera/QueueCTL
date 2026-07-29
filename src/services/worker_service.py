@@ -3,10 +3,12 @@ import time
 import uuid
 import os
 import sys
+import threading
 from datetime import datetime
 from src.services.db_service import get_connection, init_db, claim_job_atomic
 from src.models.job import Job
 from src.models.worker import Worker
+from src.services.queue_service import recover_orphaned_jobs
 
 # Global flag to signal workers to stop gracefully (e.g. from Ctrl+C signal handler)
 stop_requested = False
@@ -97,6 +99,19 @@ def clean_worker_db(worker_id):
         conn.execute("DELETE FROM workers WHERE id = ?;", (worker_id,))
         conn.commit()
 
+def heartbeat_daemon(worker_id, stop_event):
+    """Periodically heartbeats to DB in a separate thread to prevent timeouts during long command execution."""
+    while not stop_event.is_set():
+        try:
+            heartbeat_worker(worker_id)
+        except Exception:
+            pass
+        # Wait 5 seconds, checking stop_event in small intervals
+        for _ in range(50):
+            if stop_event.is_set():
+                break
+            time.sleep(0.1)
+
 def worker_loop(worker_id=None):
     """Main worker loop starting in the foreground."""
     global stop_requested
@@ -106,6 +121,11 @@ def worker_loop(worker_id=None):
         
     register_worker(worker_id)
     print(f"Worker {worker_id} started (PID: {os.getpid()})...")
+    
+    # Start heartbeat thread
+    stop_event = threading.Event()
+    t = threading.Thread(target=heartbeat_daemon, args=(worker_id, stop_event), daemon=True)
+    t.start()
     
     # Load backoff configuration base
     backoff_base = 2.0
@@ -117,9 +137,12 @@ def worker_loop(worker_id=None):
 
     try:
         while not stop_requested:
-            # Update heartbeat
-            heartbeat_worker(worker_id)
-            
+            # Periodically recover orphaned jobs from other crashed workers
+            try:
+                recover_orphaned_jobs()
+            except Exception as e:
+                print(f"[{worker_id}] Recovery warning: {str(e)}", file=sys.stderr)
+                
             # Check remote stop signal
             if check_remote_stop(worker_id):
                 print(f"Worker {worker_id} stopping due to remote stop signal.")
@@ -142,12 +165,12 @@ def worker_loop(worker_id=None):
                     print(f"[{worker_id}] Job {job.id} completed successfully.")
                 else:
                     print(f"[{worker_id}] Job {job.id} failed (exit code: {returncode}).")
-                
-                # Update heartbeat immediately after job completes
-                heartbeat_worker(worker_id)
             else:
                 # Sleep if no jobs
                 time.sleep(1)
     finally:
         print(f"Worker {worker_id} shutting down cleanly...")
+        # Stop the heartbeat thread
+        stop_event.set()
+        t.join(timeout=2.0)
         clean_worker_db(worker_id)

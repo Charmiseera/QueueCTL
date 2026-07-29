@@ -7,23 +7,16 @@ from src.services.db_service import DB_PATH
 
 class TestCLIContract(unittest.TestCase):
     def setUp(self):
-        # Remove DB file if exists to start fresh
-        if os.path.exists(DB_PATH):
-            try:
-                os.remove(DB_PATH)
-            except:
-                pass
-            # Also clean WAL files
-            if os.path.exists(DB_PATH + "-wal"):
-                try:
-                    os.remove(DB_PATH + "-wal")
-                except:
-                    pass
-            if os.path.exists(DB_PATH + "-shm"):
-                try:
-                    os.remove(DB_PATH + "-shm")
-                except:
-                    pass
+        # Clean DB tables instead of deleting the locked file
+        from src.services.db_service import get_connection
+        try:
+            with get_connection() as conn:
+                conn.execute("DROP TABLE IF EXISTS jobs;")
+                conn.execute("DROP TABLE IF EXISTS workers;")
+                conn.execute("DROP TABLE IF EXISTS config;")
+                conn.commit()
+        except:
+            pass
 
     def tearDown(self):
         self.setUp()

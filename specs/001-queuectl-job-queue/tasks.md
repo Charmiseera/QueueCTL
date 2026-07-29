@@ -115,13 +115,13 @@
 
 ### Tests for User Story 4
 
-- [ ] T021 [P] [US4] Create crash recovery integration test in `tests/integration/test_queue.py` verifying recovery triggers under 60 seconds
+- [x] T021 [P] [US4] Create crash recovery integration test in `tests/integration/test_queue.py` verifying recovery triggers under 60 seconds
 
 ### Implementation for User Story 4
 
-- [ ] T022 [US4] Implement worker registration and heartbeat check-in in `src/services/worker_service.py`
-- [ ] T023 [US4] Implement orphan search query and recovery update in `src/services/queue_service.py`
-- [ ] T024 [US4] Implement periodic heartbeat update loop in worker execution thread/process in `src/services/worker_service.py`
+- [x] T022 [US4] Implement worker registration and heartbeat check-in in `src/services/worker_service.py`
+- [x] T023 [US4] Implement orphan search query and recovery update in `src/services/queue_service.py`
+- [x] T024 [US4] Implement periodic heartbeat update loop in worker execution thread/process in `src/services/worker_service.py`
 
 ---
 

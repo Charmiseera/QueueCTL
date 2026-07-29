@@ -4,43 +4,12 @@ import uuid
 import os
 import sys
 from datetime import datetime
-from src.services.db_service import get_connection, init_db
+from src.services.db_service import get_connection, init_db, claim_job_atomic
 from src.models.job import Job
 from src.models.worker import Worker
 
 # Global flag to signal workers to stop gracefully (e.g. from Ctrl+C signal handler)
 stop_requested = False
-
-def claim_job_simple(worker_id):
-    """Simple claim query for T010. We will upgrade this to atomic BEGIN IMMEDIATE in US3."""
-    now_str = datetime.utcnow().isoformat() + "Z"
-    with get_connection() as conn:
-        # Find first eligible job
-        cursor = conn.execute("""
-        SELECT * FROM jobs
-        WHERE (state = 'pending' OR state = 'failed') AND datetime(run_at) <= datetime(?)
-        ORDER BY created_at ASC
-        LIMIT 1;
-        """, (now_str,))
-        row = cursor.fetchone()
-        if not row:
-            return None
-        
-        job = Job.from_row(row)
-        
-        # Claim it
-        conn.execute("""
-        UPDATE jobs
-        SET state = 'processing', worker_id = ?, updated_at = ?, attempts = attempts + 1
-        WHERE id = ?;
-        """, (worker_id, now_str, job.id))
-        conn.commit()
-        
-        job.state = 'processing'
-        job.worker_id = worker_id
-        job.attempts += 1
-        job.updated_at = now_str
-        return job
 
 def run_job(job):
     """Executes a job's command via shell and returns the exit code."""
@@ -156,8 +125,9 @@ def worker_loop(worker_id=None):
                 print(f"Worker {worker_id} stopping due to remote stop signal.")
                 break
                 
-            # Attempt to claim a job (simple claim for now)
-            job = claim_job_simple(worker_id)
+            # Attempt to claim a job atomically
+            now_str = datetime.utcnow().isoformat() + "Z"
+            job = claim_job_atomic(worker_id, now_str)
             if job:
                 print(f"[{worker_id}] Processing Job {job.id}: '{job.command}' (Attempt {job.attempts}/{job.max_retries})")
                 

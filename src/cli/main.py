@@ -6,6 +6,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import json
 import argparse
 import signal
+import subprocess
+import time
 from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job
 from src.services.db_service import init_db, get_connection
 import src.services.worker_service as worker_service
@@ -50,8 +52,6 @@ def handle_dlq(args):
     try:
         if args.subcommand == "list":
             jobs = list_jobs("dead")
-            # If they want JSON format, we could support that or default to print layout
-            # Standard list command already handles --json, but we can do a simple print here:
             if not jobs:
                 print("No jobs in DLQ.")
             for job in jobs:
@@ -79,16 +79,47 @@ def handle_worker_start(args):
     init_db()
     setup_signals()
     
-    # Check count option
     count = getattr(args, "count", 1) or 1
     
     if count > 1:
-        # We will implement multi-process start in US3
-        print(f"Starting {count} worker processes in background (simulated in foreground master)...", file=sys.stderr)
-        # For now, let's just run a single worker in the foreground for US1
-        worker_service.worker_loop()
+        processes = []
+        print(f"Starting {count} parallel worker processes in foreground...", file=sys.stderr)
+        try:
+            for _ in range(count):
+                p = subprocess.Popen([sys.executable, __file__, "worker", "start", "--count", "1"])
+                processes.append(p)
+            
+            # Wait for all processes to finish, periodically checking if master received stop signal
+            while processes and not worker_service.stop_requested:
+                for p in list(processes):
+                    ret = p.poll()
+                    if ret is not None:
+                        processes.remove(p)
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            if processes:
+                print("Stopping all child worker processes...", file=sys.stderr)
+                # Signal stop in DB so workers terminate gracefully
+                with get_connection() as conn:
+                    conn.execute("UPDATE workers SET should_stop = 1;")
+                    conn.commit()
+                # Wait for them to exit
+                for p in processes:
+                    try:
+                        p.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        p.terminate()
     else:
         worker_service.worker_loop()
+
+def handle_worker_stop(args):
+    init_db()
+    with get_connection() as conn:
+        conn.execute("UPDATE workers SET should_stop = 1;")
+        conn.commit()
+    print("Sent stop signal to all active workers.")
 
 def main():
     parser = argparse.ArgumentParser(description="QueueCTL CLI")
@@ -147,8 +178,7 @@ def main():
         if args.subcommand == "start":
             handle_worker_start(args)
         elif args.subcommand == "stop":
-            # Will implement under US3 / worker stop
-            pass
+            handle_worker_stop(args)
     elif args.command == "status":
         # Will implement under status
         pass

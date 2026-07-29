@@ -62,3 +62,58 @@ def init_db():
         """, (str(DEFAULT_BACKOFF_BASE),))
         
         conn.commit()
+
+def claim_job_atomic(worker_id, now_str):
+    """Claims the next pending job atomically using BEGIN IMMEDIATE transaction."""
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE TRANSACTION;")
+        # Find next eligible job
+        cursor = conn.execute("""
+        SELECT id, command, state, attempts, max_retries, worker_id, run_at, created_at, updated_at
+        FROM jobs
+        WHERE (state = 'pending' OR state = 'failed') AND datetime(run_at) <= datetime(?)
+        ORDER BY created_at ASC
+        LIMIT 1;
+        """, (now_str,))
+        row = cursor.fetchone()
+        if not row:
+            conn.execute("COMMIT;")
+            return None
+        
+        job_id = row["id"]
+        # Update job to processing, set worker_id, and increment attempts
+        conn.execute("""
+        UPDATE jobs
+        SET state = 'processing', worker_id = ?, updated_at = ?, attempts = attempts + 1
+        WHERE id = ?;
+        """, (worker_id, now_str, job_id))
+        
+        # Refetch the updated job inside the transaction
+        cursor = conn.execute("""
+        SELECT id, command, state, attempts, max_retries, worker_id, run_at, created_at, updated_at
+        FROM jobs
+        WHERE id = ?;
+        """, (job_id,))
+        updated_row = cursor.fetchone()
+        
+        conn.execute("COMMIT;")
+        
+        from src.models.job import Job
+        return Job.from_row(updated_row)
+    except sqlite3.OperationalError:
+        # DB is locked by another process claiming a job.
+        try:
+            conn.execute("ROLLBACK;")
+        except:
+            pass
+        return None
+    except Exception as e:
+        try:
+            conn.execute("ROLLBACK;")
+        except:
+            pass
+        raise e
+    finally:
+        conn.close()
+

@@ -95,13 +95,13 @@
 
 ### Tests for User Story 3
 
-- [ ] T017 [P] [US3] Create concurrency integration tests in `tests/integration/test_queue.py` simulating parallel workers
+- [x] T017 [P] [US3] Create concurrency integration tests in `tests/integration/test_queue.py` simulating parallel workers
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Implement atomic job claim transaction utilizing `BEGIN IMMEDIATE` in `src/services/db_service.py`
-- [ ] T019 [US3] Implement worker selection logic in `src/services/worker_service.py` using the atomic claim transaction
-- [ ] T020 [US3] Implement `worker start` and `worker stop` CLI commands in `src/cli/main.py`
+- [x] T018 [US3] Implement atomic job claim transaction utilizing `BEGIN IMMEDIATE` in `src/services/db_service.py`
+- [x] T019 [US3] Implement worker selection logic in `src/services/worker_service.py` using the atomic claim transaction
+- [x] T020 [US3] Implement `worker start` and `worker stop` CLI commands in `src/cli/main.py`
 
 **Checkpoint**: At this point, User Stories 1, 2, and 3 should work concurrently
 

@@ -8,7 +8,7 @@ import argparse
 import signal
 import subprocess
 import time
-from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job
+from src.services.queue_service import enqueue_job, list_jobs, retry_dlq_job, set_config
 from src.services.db_service import init_db, get_connection
 import src.services.worker_service as worker_service
 
@@ -59,6 +59,18 @@ def handle_dlq(args):
         elif args.subcommand == "retry":
             retry_dlq_job(args.job_id)
             print(f"Job {args.job_id} successfully re-enqueued from DLQ.")
+    except ValueError as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(2)
+
+def handle_config(args):
+    try:
+        if args.subcommand == "set":
+            set_config(args.key, args.value)
+            print(f"Configuration key '{args.key}' set to '{args.value}'.")
     except ValueError as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
@@ -185,8 +197,7 @@ def main():
     elif args.command == "dlq":
         handle_dlq(args)
     elif args.command == "config":
-        # Will implement under config
-        pass
+        handle_config(args)
 
 if __name__ == "__main__":
     main()

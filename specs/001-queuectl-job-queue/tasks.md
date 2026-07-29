@@ -133,12 +133,12 @@
 
 ### Tests for User Story 5
 
-- [ ] T025 [P] [US5] Create unit tests in `tests/unit/test_services.py` for config getter and setter overrides
+- [x] T025 [P] [US5] Create unit tests in `tests/unit/test_services.py` for config getter and setter overrides
 
 ### Implementation for User Story 5
 
-- [ ] T026 [US5] Implement get/set operations in `src/services/queue_service.py` for persistent configuration keys (`max-retries` and `backoff-base`)
-- [ ] T027 [US5] Implement `config set` parsing in `src/cli/main.py`
+- [x] T026 [US5] Implement get/set operations in `src/services/queue_service.py` for persistent configuration keys (`max-retries` and `backoff-base`)
+- [x] T027 [US5] Implement `config set` parsing in `src/cli/main.py`
 
 ---
 

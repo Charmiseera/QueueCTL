@@ -106,4 +106,40 @@ def recover_orphaned_jobs():
             
         conn.commit()
 
+def set_config(key, value):
+    """Sets a configuration value in the database, validating value type."""
+    init_db()
+    
+    # Validation
+    if key == "max-retries":
+        try:
+            val_int = int(value)
+            if val_int < 0:
+                raise ValueError()
+        except ValueError:
+            raise ValueError("max-retries must be a non-negative integer.")
+    elif key == "backoff-base":
+        try:
+            val_float = float(value)
+            if val_float <= 0:
+                raise ValueError()
+        except ValueError:
+            raise ValueError("backoff-base must be a positive number.")
+            
+    with get_connection() as conn:
+        conn.execute("""
+        INSERT OR REPLACE INTO config (key, value)
+        VALUES (?, ?);
+        """, (key, str(value)))
+        conn.commit()
+
+def get_config(key):
+    """Gets a configuration value from the database."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.execute("SELECT value FROM config WHERE key = ?;", (key,))
+        row = cursor.fetchone()
+        return row["value"] if row else None
+
+
 

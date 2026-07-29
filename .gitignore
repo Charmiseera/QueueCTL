@@ -10,4 +10,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
-/
+.agents/
+.specify/
+/specs

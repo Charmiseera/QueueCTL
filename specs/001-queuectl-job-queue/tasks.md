@@ -53,14 +53,14 @@
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] Create unit tests for Job serialization and state queries in `tests/unit/test_models.py`
-- [ ] T008 [P] [US1] Create contract test for `enqueue` and `list` output format in `tests/contract/test_cli.py`
+- [x] T007 [P] [US1] Create unit tests for Job serialization and state queries in `tests/unit/test_models.py`
+- [x] T008 [P] [US1] Create contract test for `enqueue` and `list` output format in `tests/contract/test_cli.py`
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Implement enqueuing database operations and queue listings in `src/services/queue_service.py`
-- [ ] T010 [US1] Implement basic job execution using subprocess command runners in `src/services/worker_service.py`
-- [ ] T011 [US1] Create command routing parser for `enqueue` and `list` in `src/cli/main.py`
+- [x] T009 [US1] Implement enqueuing database operations and queue listings in `src/services/queue_service.py`
+- [x] T010 [US1] Implement basic job execution using subprocess command runners in `src/services/worker_service.py`
+- [x] T011 [US1] Create command routing parser for `enqueue` and `list` in `src/cli/main.py`
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
